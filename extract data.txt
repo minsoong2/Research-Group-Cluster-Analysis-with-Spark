@@ -1,0 +1,14 @@
+jounralInfo
+journal-name
+publisher-name
+publisher-year
+
+articleInfo
+article-categories
+author-group
+    author
+        text
+
+MongoDB 검색 ex
+{ "articleInfo.author-group.author" : "박범진(한국항공우주연구원)" }
+{ "articleInfo.author-group.author.#text" : "박범진(한국항공우주연구원)" }
