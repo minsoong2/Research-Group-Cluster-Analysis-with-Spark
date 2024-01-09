@@ -62,20 +62,22 @@ def extract_data(document_data):
 
     # extract articleInfo field
     article_info = document_data.get('articleInfo', {})
-    if extract_document_field:
-        extract_document_field['article_categories'] = article_info.get('article-categories', '')
+    if article_info:
+        if article_info.get('article-categories', '') is not None:
+            extract_document_field['article_categories'] = article_info.get('article-categories', '')
+        else:
+            return None
     else:
         return None
 
-    # extract author-group field
+    # extract author-group field in articleInfo field
     author_group = article_info.get('author-group', {})
     if author_group:
         authors = author_group.get('author', None)
+        if authors is not None:
+            extract_document_field['authors'] = extract_authors(authors)
     else:
         return None
-
-    if authors is not None:
-        extract_document_field['authors'] = extract_authors(authors)
 
     # Verify that all fields were extracted properly
     if not verify_all_fields(extract_document_field):
@@ -94,18 +96,16 @@ def main():
             if data:
                 extracted_data.append(data)
                 document_cnt += 1
-                print(extract_data(document))
-                print(document_cnt)
+                print(document_cnt, data)
                 data_string = json.dumps(data, ensure_ascii=False)
                 f.write(data_string + '\n')
 
-        df = spark.createDataFrame([Row(**x) for x in extracted_data if x is not None], schema=schema)
+        df = spark.createDataFrame([Row(**x) for x in extracted_data], schema=schema)
         split_words_udf = udf(lambda x: x.split(), ArrayType(StringType()))
-        for field in fields:
-            df = df.withColumn(field, split_words_udf(col(field)))
+        df = df.withColumn("authors", split_words_udf(col("authors")))
 
         # Word2Vec 모델 설정 및 학습
-        word2Vec = Word2Vec(vectorSize=100, minCount=0, inputCol="journal_name", outputCol="journal_name_emb")
+        word2Vec = Word2Vec(vectorSize=100, minCount=0, inputCol="authors", outputCol="authors_emb")
         model = word2Vec.fit(df)
 
         # 임베딩 결과를 DataFrame에 추가
