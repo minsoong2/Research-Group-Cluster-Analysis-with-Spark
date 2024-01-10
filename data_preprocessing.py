@@ -5,7 +5,6 @@ import pyspark
 from pyspark.ml.feature import Word2Vec
 from pyspark.sql import SparkSession
 from pyspark.sql import Row
-from pyspark.sql.functions import col, udf
 from pyspark.sql.types import StructType, StructField, StringType, ArrayType
 
 client = mc('mongodb://10.100.54.129:27017/')
@@ -87,6 +86,7 @@ def extract_data(document_data):
 
 
 def main():
+
     with open("data.txt", "w", encoding='utf-8') as f:
         extracted_data = []
         document_cnt = 0
@@ -101,8 +101,6 @@ def main():
                 f.write(data_string + '\n')
 
         df = spark.createDataFrame([Row(**x) for x in extracted_data], schema=schema)
-        split_words_udf = udf(lambda x: x.split(), ArrayType(StringType()))
-        df = df.withColumn("authors", split_words_udf(col("authors")))
 
         # Word2Vec 모델 설정 및 학습
         word2Vec = Word2Vec(vectorSize=100, minCount=0, inputCol="authors", outputCol="authors_emb")
