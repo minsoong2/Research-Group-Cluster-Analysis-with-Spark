@@ -5,7 +5,7 @@ import pyspark
 from pyspark.ml.feature import Word2Vec
 from pyspark.sql import SparkSession
 from pyspark.sql import Row
-from pyspark.sql.functions import udf
+from pyspark.sql.functions import udf, concat_ws
 from pyspark.sql.types import StructType, StructField, StringType, ArrayType
 
 client = mc('mongodb://10.100.54.129:27017/')
@@ -92,8 +92,11 @@ def extract_data(document_data):
         return None
 
 
-def split_author_name(author):
-    return author.split('(')[0].strip().split()
+def to_word_list(*fields):
+    word_list = []
+    for field in fields:
+        word_list.extend(str(field).split())
+    return word_list
 
 
 def main():
@@ -112,12 +115,13 @@ def main():
                     data_string = json.dumps(extract_document_data, ensure_ascii=False)
                     f.write(data_string + '\n')
 
-        split_author_name_udf = udf(split_author_name, ArrayType(StringType()))
+        to_word_list_udf = udf(to_word_list, ArrayType(StringType()))
         df = spark.createDataFrame([Row(**x) for x in extracted_data], schema=schema)
-        df = df.withColumn("author", split_author_name_udf(df["author"]))
+        df = df.withColumn("all_fields", concat_ws(" ", df.journal_name, df.publisher_name, df.pub_year, df.article_categories, df.author))
+        df = df.withColumn("all_words", to_word_list_udf(df["all_fields"]))
 
         # Word2Vec 모델 설정 및 학습
-        word2Vec = Word2Vec(vectorSize=100, minCount=0, inputCol="author", outputCol="author_emb")
+        word2Vec = Word2Vec(vectorSize=100, minCount=0, inputCol="all_words", outputCol="all_fields_emb")
         model = word2Vec.fit(df)
 
         # 임베딩 결과를 DataFrame에 추가
